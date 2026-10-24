@@ -1,0 +1,7 @@
+{
+  "name": "bassam-tv-home",
+  "version": "1.0.0",
+  "packageType": "app",
+  "appName": "شاشتي",
+  "appPath": "app/index.html"
+}
