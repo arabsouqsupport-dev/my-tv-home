@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>شاشتي</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 1920px; height: 1080px;
+    background: #0e1116; overflow: hidden;
+    font-family: 'TajawalLocal', 'Tajawal', sans-serif;
+    color: #fff;
+  }
+  @font-face {
+    font-family: 'TajawalLocal';
+    src: local('Tajawal');
+  }
+
+  /* ---------- layers ---------- */
+  #bg {
+    position: absolute; inset: 0; transition: background 2s ease;
+  }
+  /* same dark neutral family all day — only the tone shifts slightly, never the hue/style */
+  .phase-night  #bg { background: linear-gradient(180deg,#11161d 0%,#0a0d12 70%); }
+  .phase-dawn   #bg { background: linear-gradient(180deg,#171d26 0%,#0c1016 70%); }
+  .phase-day    #bg { background: linear-gradient(180deg,#1b222c 0%,#11161d 70%); }
+  .phase-sunset #bg { background: linear-gradient(180deg,#141a23 0%,#0b0f15 70%); }
+
+  #stars { position: absolute; inset: 0; opacity: 0; transition: opacity 2s ease; }
+  .phase-night #stars, .phase-dawn #stars { opacity: 1; }
+  .phase-day #stars { opacity: 0; }
+  .phase-sunset #stars { opacity: .4; }
+
+  /* one flat moon/sun glyph, always the same lavender-on-dark palette */
+  #sunmoon { position: absolute; top: 110px; left: 120px; width: 180px; height: 180px; }
+  #sunmoon .glow { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(201,185,255,0.18) 0%, rgba(201,185,255,0) 70%); }
+  #sunmoon .body { position: absolute; top: 46px; left: 46px; width: 88px; height: 88px; border-radius: 50%; background: #e7e1ff; clip-path: ellipse(60% 100% at 70% 50%); }
+  #sunmoon .sunburst { position: absolute; inset: 0; display: none; }
+  .phase-day #sunmoon .body { display: none; }
+  .phase-day #sunmoon .sunburst { display: block; }
+
+  /* ---------- home view ---------- */
+  #home { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 54px 84px; transition: opacity .6s ease; }
+
+  #topRow { display: flex; align-items: center; justify-content: space-between; }
+  #clockSmall { font-weight: 500; font-size: 33px; }
+  #dateSmall { font-size: 22px; opacity: 0.45; margin-right: 10px; }
+
+  .sectionLabel { color: rgba(255,255,255,0.4); font-size: 21px; font-weight: 500; margin: 30px 0 14px; }
+
+  #favRow, #inputRow, #appsRow { display: flex; flex-direction: row-reverse; gap: 30px; }
+
+  .tile {
+    border-radius: 21px; background: #1b1e24; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 600; font-size: 33px; cursor: pointer; outline: none; position: relative;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .tile.fav { width: 354px; height: 204px; }
+  .tile.input { width: 354px; height: 96px; font-size: 22px; background: #16181d; }
+  .tile.app { width: 132px; height: 132px; background: #16181d; }
+  .tile:focus, .tile.focused { box-shadow: 0 0 0 3px #cdbdfb, 0 24px 48px rgba(0,0,0,.5); transform: translateY(-6px) scale(1.03); }
+  .tile.missing { opacity: 0.35; font-size: 24px; font-weight: 400; }
+
+  /* ---------- screensaver view ---------- */
+  #screensaver { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 1.2s ease; }
+  #screensaver.active { opacity: 1; pointer-events: auto; }
+  #home.hidden { opacity: 0; pointer-events: none; }
+
+  #ssTime { position: absolute; bottom: 225px; right: 96px; text-align: right; }
+  #ssTime .t { font-weight: 300; font-size: 120px; line-height: 1; letter-spacing: -1px; }
+  #ssTime .t span { font-size: 42px; font-weight: 300; opacity: .55; margin-right: 10px; }
+  #ssTime .d { margin-top: 14px; font-size: 25px; font-weight: 400; color: rgba(255,255,255,.55); }
+
+  #ssCity { position: absolute; top: 96px; right: 96px; font-size: 27px; color: rgba(255,255,255,.5); display:flex; align-items:center; gap:10px; }
+
+  #ssInfo { position: absolute; left: 96px; right: 96px; bottom: 84px; display: flex; align-items: center; justify-content: space-between; font-size: 25px; color: rgba(255,255,255,.85); }
+  #ssInfo .item { display: flex; align-items: center; gap: 18px; }
+  #ssInfo .ic { width: 60px; height: 60px; border-radius: 18px; background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; }
+  #ssInfo b { color: #fff; font-weight: 600; }
+</style>
+</head>
+<body class="phase-night">
+
+<div id="bg"></div>
+<svg id="stars" width="1920" height="1080" aria-hidden="true">
+  <circle cx="210" cy="135" r="2.2" fill="#fff" opacity="0.5"/>
+  <circle cx="390" cy="225" r="1.8" fill="#fff" opacity="0.35"/>
+  <circle cx="630" cy="105" r="2" fill="#fff" opacity="0.45"/>
+  <circle cx="915" cy="195" r="1.8" fill="#fff" opacity="0.3"/>
+  <circle cx="1140" cy="90" r="2.2" fill="#fff" opacity="0.5"/>
+  <circle cx="1350" cy="165" r="1.8" fill="#fff" opacity="0.35"/>
+  <circle cx="1560" cy="120" r="2" fill="#fff" opacity="0.4"/>
+  <circle cx="1770" cy="210" r="1.8" fill="#fff" opacity="0.3"/>
+  <circle cx="510" cy="285" r="1.5" fill="#fff" opacity="0.25"/>
+  <circle cx="1470" cy="270" r="1.5" fill="#fff" opacity="0.25"/>
+</svg>
+<div id="sunmoon">
+  <div class="glow"></div>
+  <div class="body"></div>
+  <svg class="sunburst" viewBox="0 0 180 180" aria-hidden="true">
+    <polygon points="176,90 155,101 171,119 147,123 156,145 132,141 133,164 113,152 105,175 90,156 75,175 67,152 47,164 48,141 24,145 33,123 9,119 25,101 4,90 25,79 9,61 33,57 24,35 48,39 47,16 67,28 75,5 90,24 105,5 113,28 133,16 132,39 156,35 147,57 171,61 155,79" fill="#e7e1ff"/>
+  </svg>
+</div>
+
+<!-- ===================== HOME ===================== -->
+<div id="home">
+  <div id="topRow">
+    <div><span id="clockSmall">—</span><span id="dateSmall">—</span></div>
+  </div>
+
+  <div class="sectionLabel">المفضلة</div>
+  <div id="favRow"></div>
+
+  <div class="sectionLabel">المداخل</div>
+  <div id="inputRow">
+    <div class="tile input">HDMI 1</div>
+    <div class="tile input">HDMI 2</div>
+    <div class="tile input">HDMI 3</div>
+  </div>
+
+  <div class="sectionLabel">كل التطبيقات</div>
+  <div id="appsRow"></div>
+</div>
+
+<!-- ===================== SCREENSAVER ===================== -->
+<div id="screensaver">
+  <div id="ssCity">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 22s7-7.5 7-13a7 7 0 1 0-14 0c0 5.5 7 13 7 13Z" stroke="#fff" stroke-width="1.6"/><circle cx="12" cy="9" r="2.2" stroke="#fff" stroke-width="1.6"/></svg>
+    إربد، الأردن
+  </div>
+  <div id="ssTime">
+    <div class="t"><span id="ssClock">—</span></div>
+    <div class="d" id="ssDate">—</div>
+  </div>
+  <div id="ssInfo">
+    <div class="item"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4" stroke="#cdbdfb" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="4.5" stroke="#cdbdfb" stroke-width="1.6"/></svg></div><div>الصلاة القادمة <b id="ssPrayer">—</b></div></div>
+    <div class="item"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 18h16M8 18v-5l4-9 4 9v5" stroke="#cdbdfb" stroke-width="1.6" stroke-linejoin="round"/></svg></div><div>رمضان بعد <b id="ssRamadan">—</b></div></div>
+    <div class="item"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" stroke="#cdbdfb" stroke-width="1.6"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="#cdbdfb" stroke-width="1.6" stroke-linecap="round"/></svg></div><div>الطقس <b id="ssWeather">—</b></div></div>
+    <div class="item" id="ssGoldWrap"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#cdbdfb" stroke-width="1.6"/><path d="M9 15.5V9.8c0-.7.6-1.3 1.3-1.3h1.4a2 2 0 0 1 0 4H10m0 0h2.3a2 2 0 0 1 0 4H9" stroke="#cdbdfb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div>الذهب <b id="ssGold">—</b></div></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — edit these for your city / preferences
+   ============================================================ */
+var CONFIG = {
+  cityName: 'إربد، الأردن',
+  lat: 32.5556,
+  lon: 35.85,
+  timezone: 'Asia/Amman',
+  prayerMethod: 4,          // Aladhan method 4 = Umm Al-Qura (Makkah)
+  idleMsToScreensaver: 120000, // 2 minutes idle -> screensaver
+  favoriteSearchTerms: [
+    { label: 'NETFLIX',   match: ['netflix'] },
+    { label: 'YouTube',   match: ['youtube'] },
+    { label: 'shahid',    match: ['shahid', 'osn', 'mbc'] },
+    { label: 'WATCHiT',   match: ['watchit'] },
+    { label: 'Yango Play',match: ['yango'] }
+  ],
+  goldApiUrl: 'https://api.gold-api.com/price/XAU' // free, no key — swap if it stops working
+};
+
+/* ============================================================
+   small date / clock helpers
+   ============================================================ */
+function pad(n){ return n < 10 ? '0'+n : ''+n; }
+
+function fmtClock(d){
+  var h = d.getHours(), m = d.getMinutes();
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return { text: h12 + ':' + pad(m), ampm: ampm };
+}
+
+var GREG_DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+var GREG_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+var HIJRI_MONTHS = ['محرم','صفر','ربيع الأول','ربيع الآخر','جمادى الأولى','جمادى الآخرة','رجب','شعبان','رمضان','شوال','ذو القعدة','ذو الحجة'];
+
+function fmtGregorian(d){
+  return GREG_DAYS[d.getDay()] + '، ' + d.getDate() + ' ' + GREG_MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function getHijriParts(d){
+  try {
+    var parts = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(d);
+    var out = {};
+    parts.forEach(function(p){ out[p.type] = parseInt(p.value, 10); });
+    return out; // {day, month, year}
+  } catch (e) { return null; }
+}
+
+function fmtHijri(d){
+  var h = getHijriParts(d);
+  if (!h) return '';
+  return h.day + ' ' + (HIJRI_MONTHS[h.month - 1] || '') + ' ' + h.year + 'هـ';
+}
+
+function daysUntilNextRamadan(from){
+  for (var i = 0; i < 400; i++){
+    var d = new Date(from.getTime() + i * 86400000);
+    var h = getHijriParts(d);
+    if (h && h.month === 9 && h.day === 1) return i;
+  }
+  return null;
+}
+
+/* ============================================================
+   time-of-day phase (controls background theme)
+   ============================================================ */
+function updatePhase(d){
+  var h = d.getHours();
+  var phase = 'night';
+  if (h >= 5 && h < 7) phase = 'dawn';
+  else if (h >= 7 && h < 17) phase = 'day';
+  else if (h >= 17 && h < 19) phase = 'sunset';
+  else phase = 'night';
+  document.body.className = document.body.className.replace(/phase-\w+/, '').trim();
+  document.body.classList.add('phase-' + phase);
+}
+
+/* ============================================================
+   clock tick
+   ============================================================ */
+function tick(){
+  var now = new Date();
+  updatePhase(now);
+
+  var c = fmtClock(now);
+  document.getElementById('clockSmall').textContent = c.text + ' ' + c.ampm;
+  document.getElementById('dateSmall').textContent = fmtGregorian(now);
+
+  document.getElementById('ssClock').innerHTML = c.text + '<span>' + c.ampm + '</span>';
+  document.getElementById('ssDate').textContent = fmtGregorian(now) + '  ·  ' + fmtHijri(now);
+}
+tick();
+setInterval(tick, 15000);
+
+/* ============================================================
+   Ramadan countdown — once a day is plenty
+   ============================================================ */
+function refreshRamadan(){
+  var n = daysUntilNextRamadan(new Date());
+  document.getElementById('ssRamadan').textContent = (n === null ? '—' : n + ' يوماً');
+}
+refreshRamadan();
+setInterval(refreshRamadan, 3600000);
+
+/* ============================================================
+   Prayer times — Aladhan API (free, no key)
+   ============================================================ */
+var prayerTimes = null; // {Fajr, Dhuhr, Asr, Maghrib, Isha} as "HH:mm"
+var PRAYER_LABELS = { Fajr: 'الفجر', Dhuhr: 'الظهر', Asr: 'العصر', Maghrib: 'المغرب', Isha: 'العشاء' };
+var PRAYER_ORDER = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+
+function fetchPrayerTimes(){
+  var ts = Math.floor(Date.now() / 1000);
+  var url = 'https://api.aladhan.com/v1/timings/' + ts + '?latitude=' + CONFIG.lat + '&longitude=' + CONFIG.lon + '&method=' + CONFIG.prayerMethod;
+  fetch(url).then(function(r){ return r.json(); }).then(function(j){
+    if (j && j.data && j.data.timings) {
+      prayerTimes = j.data.timings;
+      refreshNextPrayer();
+    }
+  }).catch(function(){ /* leave as — */ });
+}
+
+function parseHHMM(s, base){
+  var m = /^(\d{1,2}):(\d{2})/.exec(s || '');
+  if (!m) return null;
+  var d = new Date(base);
+  d.setHours(parseInt(m[1], 10), parseInt(m[2], 10), 0, 0);
+  return d;
+}
+
+function refreshNextPrayer(){
+  if (!prayerTimes) return;
+  var now = new Date();
+  var next = null, nextName = null;
+  for (var i = 0; i < PRAYER_ORDER.length; i++){
+    var name = PRAYER_ORDER[i];
+    var d = parseHHMM(prayerTimes[name], now);
+    if (d && d > now) { next = d; nextName = name; break; }
+  }
+  if (!next) { // all done for today -> tomorrow's Fajr
+    var tmr = new Date(now.getTime() + 86400000);
+    next = parseHHMM(prayerTimes.Fajr, tmr);
+    nextName = 'Fajr';
+  }
+  if (next && nextName) {
+    var c = fmtClock(next);
+    document.getElementById('ssPrayer').textContent = PRAYER_LABELS[nextName] + ' ' + c.text + ' ' + c.ampm;
+  }
+}
+fetchPrayerTimes();
+setInterval(fetchPrayerTimes, 3600000);
+setInterval(refreshNextPrayer, 30000);
+
+/* ============================================================
+   Weather — Open-Meteo (free, no key)
+   ============================================================ */
+var WMO_AR = {
+  0:'صافٍ', 1:'صافٍ غالبًا', 2:'غائم جزئيًا', 3:'غائم',
+  45:'ضباب', 48:'ضباب كثيف',
+  51:'رذاذ خفيف', 53:'رذاذ', 55:'رذاذ كثيف',
+  61:'مطر خفيف', 63:'مطر', 65:'مطر غزير',
+  71:'ثلج خفيف', 73:'ثلج', 75:'ثلج كثيف',
+  80:'زخات مطر', 81:'زخات مطر', 82:'زخات مطر غزيرة',
+  95:'عاصفة رعدية'
+};
+
+function fetchWeather(){
+  var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + CONFIG.lat + '&longitude=' + CONFIG.lon +
+    '&current=temperature_2m,weather_code&timezone=' + encodeURIComponent(CONFIG.timezone);
+  fetch(url).then(function(r){ return r.json(); }).then(function(j){
+    if (j && j.current) {
+      var t = Math.round(j.current.temperature_2m);
+      var desc = WMO_AR[j.current.weather_code] || '';
+      document.getElementById('ssWeather').textContent = t + '° ' + desc;
+    }
+  }).catch(function(){ /* leave as — */ });
+}
+fetchWeather();
+setInterval(fetchWeather, 900000);
+
+/* ============================================================
+   Gold price — swap goldApiUrl above if this endpoint changes
+   ============================================================ */
+function fetchGold(){
+  fetch(CONFIG.goldApiUrl).then(function(r){ return r.json(); }).then(function(j){
+    var price = j && (j.price || j.rate || j.ask);
+    if (price) {
+      document.getElementById('ssGold').textContent = Math.round(price).toLocaleString('en-US') + ' $ / أونصة';
+    } else {
+      document.getElementById('ssGoldWrap').style.display = 'none';
+    }
+  }).catch(function(){ document.getElementById('ssGoldWrap').style.display = 'none'; });
+}
+fetchGold();
+setInterval(fetchGold, 900000);
+
+/* ============================================================
+   Installed-app detection + favorites row (Tizen API)
+   ============================================================ */
+var favorites = []; // { label, appId|null, el }
+
+function buildFavoritesRow(appsInfo){
+  var row = document.getElementById('favRow');
+  row.innerHTML = '';
+  favorites = [];
+
+  CONFIG.favoriteSearchTerms.forEach(function(def){
+    var found = null;
+    if (appsInfo) {
+      for (var i = 0; i < appsInfo.length; i++){
+        var name = (appsInfo[i].name || '').toLowerCase();
+        for (var j = 0; j < def.match.length; j++){
+          if (name.indexOf(def.match[j]) !== -1) { found = appsInfo[i]; break; }
+        }
+        if (found) break;
+      }
+    }
+    var tile = document.createElement('div');
+    tile.className = 'tile fav' + (found ? '' : ' missing');
+    tile.tabIndex = 0;
+    tile.textContent = found ? def.label : (def.label + ' — غير مثبت');
+    if (found) {
+      tile.addEventListener('click', function(appId){
+        return function(){ launchApp(appId); };
+      }(found.id));
+    }
+    row.appendChild(tile);
+    favorites.push({ label: def.label, appId: found ? found.id : null, el: tile });
+  });
+}
+
+function buildAppsRow(appsInfo){
+  var row = document.getElementById('appsRow');
+  row.innerHTML = '';
+  if (!appsInfo) return;
+  appsInfo.slice(0, 10).forEach(function(info){
+    var tile = document.createElement('div');
+    tile.className = 'tile app';
+    tile.title = info.name;
+    tile.addEventListener('click', function(){ launchApp(info.id); });
+    row.appendChild(tile);
+  });
+}
+
+function launchApp(appId){
+  if (!appId || typeof tizen === 'undefined') return;
+  try {
+    tizen.application.launch(appId, function(){}, function(err){ console.log('launch failed', err); });
+  } catch (e) { console.log('launch exception', e); }
+}
+
+function loadInstalledApps(){
+  if (typeof tizen === 'undefined' || !tizen.application || !tizen.application.getAppsInfo) {
+    // not running inside a Tizen app context (e.g. previewed in a desktop browser) — show placeholders
+    buildFavoritesRow(null);
+    buildAppsRow(null);
+    return;
+  }
+  tizen.application.getAppsInfo(function(apps){
+    buildFavoritesRow(apps);
+    buildAppsRow(apps);
+  }, function(err){
+    buildFavoritesRow(null);
+    buildAppsRow(null);
+  });
+}
+loadInstalledApps();
+
+/* ============================================================
+   focus / keyboard navigation across favorite tiles
+   ============================================================ */
+var focusIndex = 0;
+function updateFocusVisual(){
+  favorites.forEach(function(f, i){ f.el.classList.toggle('focused', i === focusIndex); });
+}
+
+/* ============================================================
+   idle -> screensaver, any input -> back to home
+   ============================================================ */
+var idleTimer = null;
+var ssEl = document.getElementById('screensaver');
+var homeEl = document.getElementById('home');
+
+function showScreensaver(){
+  ssEl.classList.add('active');
+  homeEl.classList.add('hidden');
+}
+function showHome(){
+  ssEl.classList.remove('active');
+  homeEl.classList.remove('hidden');
+}
+function resetIdle(){
+  showHome();
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(showScreensaver, CONFIG.idleMsToScreensaver);
+}
+resetIdle();
+
+document.addEventListener('keydown', function(e){
+  resetIdle();
+  if (ssEl.classList.contains('active')) return; // first key press just wakes it
+
+  if (favorites.length === 0) return;
+  if (e.keyCode === 37) { focusIndex = (focusIndex + 1) % favorites.length; updateFocusVisual(); } // Left (RTL)
+  else if (e.keyCode === 39) { focusIndex = (focusIndex - 1 + favorites.length) % favorites.length; updateFocusVisual(); } // Right
+  else if (e.keyCode === 13) { var f = favorites[focusIndex]; if (f && f.appId) launchApp(f.appId); } // Enter
+});
+document.addEventListener('mousemove', resetIdle);
+updateFocusVisual();
+
+/* ============================================================
+   Tizen remote "Back" key — exit the app instead of getting stuck
+   ============================================================ */
+document.addEventListener('tizenhwkey', function(e){
+  if (e.keyName === 'back') {
+    if (ssEl.classList.contains('active')) { resetIdle(); return; }
+    try { tizen.application.getCurrentApplication().exit(); } catch (err) {}
+  }
+});
+</script>
+</body>
+</html>
